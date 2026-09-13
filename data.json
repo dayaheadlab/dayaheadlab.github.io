@@ -1,7 +1,16 @@
 {
  "zone": "DE-LU",
- "generated": "2026-09-13 14:10 CEST",
- "latest": {},
+ "generated": "2026-09-13 14:23 CEST",
+ "latest": {
+  "target_day": "2026-09-14",
+  "issued_at_local": "2026-09-13 14:23 CEST",
+  "on_time": false,
+  "model": "lgbm[no-fc]",
+  "mean": 162.9024944093694,
+  "min": 72.92506492463615,
+  "max": 221.96247960970942,
+  "planned_revenue": 2712.2474127671558
+ },
  "summary": {},
  "scores": []
 }
