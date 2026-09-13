@@ -129,12 +129,18 @@ def build_site(store: TimeSeriesStore, settings: Settings, zone: str,
             "capture_daily_mean": float(on_time["capture"].mean()),
             "rev_forecast": rev_fc, "rev_perfect": rev_pf,
         }
+    # The table IS the record, so it lists on-time forecasts only. Late ones are reported as a
+    # count below it rather than filling the table with rows that do not count.
+    n_late = int(len(scores) - len(on_time)) if not scores.empty else 0
     rows_html = "".join(
-        f"<tr><td>{r.target_day}</td><td>{'是' if r.on_time else '否'}</td><td>{_fmt(r.mae)}</td>"
+        f"<tr><td>{r.target_day}</td><td>{r.model if hasattr(r, 'model') else ''}</td>"
+        f"<td>{_fmt(r.mae)}</td>"
         f"<td>{_fmt(r.rank_corr, 3)}</td><td>{_fmt(r.rev_forecast, 0)}</td><td>{_fmt(r.rev_perfect, 0)}</td>"
         f"<td>{_fmt(r.capture * 100 if r.capture is not None else None, 1, '%')}</td></tr>"
-        for r in scores.head(60).itertuples()) if not scores.empty else \
-        "<tr><td colspan=7>首个预测将在次日出清后自动打分。</td></tr>"
+        for r in on_time.head(60).itertuples()) if not on_time.empty else \
+        "<tr><td colspan=7>首条关门前发布的预测将在次日出清后自动打分并出现在这里。</td></tr>"
+    late_note = (f"<p class='muted'>另有 {n_late} 条关门后才发出的预测，已记录但不计入本表和上方统计。</p>"
+                 if n_late else "")
 
     # ---- backtest benchmark (monthly) ----------------------------------------------------
     bt_html = ""
@@ -225,11 +231,13 @@ footer{{color:var(--muted);font-size:12px;padding:30px 20px;text-align:center}}
 </dl></div>
 
 <h2>实盘记录 · Live track record</h2>
+<p class="muted">只列关门前（柏林 12:00）发布、且交割日已出清并打分的预测。储能收益按下方保守口径计算。</p>
 {summary_html}
 <div class="scroll card"><table>
-<tr><th>交割日</th><th>关门前</th><th>MAE</th><th>排序相关性</th><th>预测调度收益</th><th>完美预见收益</th><th>捕获率</th></tr>
+<tr><th>交割日</th><th>模型</th><th>MAE</th><th>排序相关性</th><th>预测调度收益</th><th>完美预见收益</th><th>捕获率</th></tr>
 {rows_html}
-</table></div>
+</table>
+{late_note}</div>
 {bt_html}
 
 <h2>方法 · Method</h2>

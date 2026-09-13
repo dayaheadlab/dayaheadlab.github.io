@@ -50,9 +50,13 @@ CREATE TABLE IF NOT EXISTS score_log (
     rev_perfect  DOUBLE,
     capture      DOUBLE,
     scored_at    TIMESTAMP,
+    model        VARCHAR,
     PRIMARY KEY (zone, target_day, issued_at)
 );
 """
+
+# Columns added after the first release; applied to stores created by an older version.
+_MIGRATIONS = ["ALTER TABLE score_log ADD COLUMN IF NOT EXISTS model VARCHAR"]
 
 
 def _to_naive_utc(ts: pd.Series) -> pd.Series:
@@ -71,6 +75,11 @@ class TimeSeriesStore:
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         self.conn = duckdb.connect(self.path)
         self.conn.execute(_DDL)
+        for sql in _MIGRATIONS:
+            try:
+                self.conn.execute(sql)
+            except duckdb.Error:  # already applied, or an older engine without IF NOT EXISTS
+                pass
 
     # ---- write -------------------------------------------------------------------------
     def upsert(self, df: pd.DataFrame) -> int:
@@ -200,11 +209,11 @@ class TimeSeriesStore:
 
     def log_score(self, row: dict) -> None:
         cols = ["zone", "target_day", "issued_at", "on_time", "n", "mae", "rmse", "rank_corr",
-                "rev_forecast", "rev_perfect", "capture", "scored_at"]
+                "rev_forecast", "rev_perfect", "capture", "scored_at", "model"]
         vals = [row.get(c) for c in cols]
-        vals[1] = pd.Timestamp(vals[1]).date()
-        vals[2] = _naive(vals[2])
-        vals[11] = _naive(vals[11])
+        vals[cols.index("target_day")] = pd.Timestamp(vals[cols.index("target_day")]).date()
+        vals[cols.index("issued_at")] = _naive(vals[cols.index("issued_at")])
+        vals[cols.index("scored_at")] = _naive(vals[cols.index("scored_at")])
         self.conn.execute(
             f"INSERT OR REPLACE INTO score_log ({','.join(cols)}) VALUES ({','.join(['?'] * len(cols))})",
             vals)

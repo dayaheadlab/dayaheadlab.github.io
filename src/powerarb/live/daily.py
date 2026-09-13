@@ -151,6 +151,7 @@ def score_pending(store: TimeSeriesStore, settings: Settings, zone: str) -> list
             "rank_corr": m["intraday_rank_corr"], "rev_forecast": rev_fc, "rev_perfect": rev_pf,
             "capture": rev_fc / rev_pf if rev_pf > 0 else None,
             "scored_at": pd.Timestamp.now(tz="UTC"),
+            "model": str(fc["model"].iloc[0]) if "model" in fc else None,
         }
         store.log_score(row)
         results.append(row)
