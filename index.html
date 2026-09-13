@@ -62,7 +62,7 @@ footer{color:var(--muted);font-size:12px;padding:30px 20px;text-align:center}
 <text x="196" y="296" fill="#444">实际 actual</text>
 </svg>
 <dl>
-<dt>发布时间</dt><dd>2026-09-13 14:23 CEST</dd>
+<dt>发布时间</dt><dd>2026-09-13 14:27 CEST</dd>
 <dt>关门前发布</dt><dd>否（关门后发布，不计入记录）</dd>
 <dt>预测均价 / 最低 / 最高</dt><dd>162.9 / 72.9 / 222.0 EUR/MWh</dd>
 <dt>储能计划收益</dt><dd>2,712 EUR（10 MW / 20 MWh，绿色放电、橙色充电）</dd>
@@ -70,11 +70,13 @@ footer{color:var(--muted);font-size:12px;padding:30px 20px;text-align:center}
 </dl></div>
 
 <h2>实盘记录 · Live track record</h2>
+<p class="muted">只列关门前（柏林 12:00）发布、且交割日已出清并打分的预测。储能收益按下方保守口径计算。</p>
 <p class='muted'>记录从第一个被打分的预测开始累计。</p>
 <div class="scroll card"><table>
-<tr><th>交割日</th><th>关门前</th><th>MAE</th><th>排序相关性</th><th>预测调度收益</th><th>完美预见收益</th><th>捕获率</th></tr>
-<tr><td colspan=7>首个预测将在次日出清后自动打分。</td></tr>
-</table></div>
+<tr><th>交割日</th><th>模型</th><th>MAE</th><th>排序相关性</th><th>预测调度收益</th><th>完美预见收益</th><th>捕获率</th></tr>
+<tr><td colspan=7>首条关门前发布的预测将在次日出清后自动打分并出现在这里。</td></tr>
+</table>
+<p class='muted'>另有 1 条关门后才发出的预测，已记录但不计入本表和上方统计。</p></div>
 
 <h2>历史回测基准 · Walk-forward backtest</h2>
 <p class="muted">同一模型在 2025-01-01 至 2026-09-12 的逐日滚动回测（每 7 天重训练）。
@@ -107,5 +109,5 @@ footer{color:var(--muted);font-size:12px;padding:30px 20px;text-align:center}
 <p class="muted">仅供研究参考，不构成投资或交易建议。Research only; not trading advice.</p>
 </div>
 </main>
-<footer>日前实验室 · 生成于 2026-09-13 14:23 CEST</footer>
+<footer>日前实验室 · 生成于 2026-09-13 14:27 CEST</footer>
 </body></html>
