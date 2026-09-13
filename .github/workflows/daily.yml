@@ -1,0 +1,59 @@
+# Daily forecast job for DayAhead Lab. Runs entirely on GitHub's runners: no dependency on
+# any personal machine being switched on. Source of truth for this file is
+# scripts/ci/daily.yml in the private project; it is copied here by scripts/sync_public_repo.py.
+#
+# Timing: the EPEX day-ahead auction closes at 12:00 Berlin = 10:00 UTC in summer (CEST) and
+# 11:00 UTC in winter (CET). Both cron times below leave at least two hours of margin, which
+# matters because GitHub can delay scheduled runs by several minutes under load.
+name: daily forecast
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # 06:00 UTC = 08:00 Berlin (summer) / 07:00 (winter)
+    - cron: "0 8 * * *"   # 08:00 UTC = 10:00 Berlin (summer) / 09:00 (winter)
+  workflow_dispatch:       # manual trigger from the Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-forecast
+  cancel-in-progress: false
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - name: Issue forecast, score what has cleared, rebuild site
+        env:
+          PYTHONPATH: src
+          PYTHONIOENCODING: utf-8
+        run: |
+          python -m powerarb.cli cloud-daily \
+            --zone DE-LU \
+            --state-dir state \
+            --site-dir . \
+            --backtest-csv outputs/de_lu_lgbm.csv
+
+      - name: Commit and push if anything changed
+        run: |
+          git config user.name  "dayaheadlab"
+          git config user.email "dayaheadlab@users.noreply.github.com"
+          git add state index.html data.json
+          if git diff --cached --quiet; then
+            echo "no changes"
+          else
+            git commit -m "daily $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+          fi

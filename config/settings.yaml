@@ -1,0 +1,49 @@
+# Default zone and study window. Zone codes follow Energy-Charts bidding-zone names.
+default_zone: DE-LU
+timezone: Europe/Berlin
+
+# D-1 published forecasts allowed as features: none | load | all.
+# Keep "none": ENTSO-E may publish day-ahead wind/solar as late as 18:00 on D-1, after the
+# 12:00 gate closure, so using them is leakage (worth 4.7pp of capture ratio). Load alone
+# adds 0.1pp and would reintroduce a dependency on publication timing.
+forecast_features: none
+
+# Public brand used on the generated site (no personal identity anywhere).
+brand:
+  name_zh: 日前实验室
+  name_en: DayAhead Lab
+
+# Reference weather points per zone for Open-Meteo (lat, lon). Kept small on purpose.
+weather_points:
+  DE-LU:
+    north: [53.55, 9.99]      # Hamburg (wind)
+    east: [52.52, 13.40]      # Berlin
+    south: [48.14, 11.58]     # Munich (solar)
+    west: [50.94, 6.96]       # Cologne
+  FR:
+    paris: [48.86, 2.35]
+    lyon: [45.76, 4.84]
+  NL:
+    amsterdam: [52.37, 4.90]
+
+# Default battery used by the arbitrage backtest and the public site.
+# "Conservative" is the published headline case; the unconstrained case is shown alongside it.
+battery:
+  power_mw: 10.0
+  energy_mwh: 20.0
+  eta_charge: 0.95
+  eta_discharge: 0.95
+  soc_initial_mwh: 0.0
+  cycle_cost_eur_per_mwh: 2.0   # degradation cost applied per MWh discharged
+  max_cycles_per_day: 1.5       # typical warranty envelope for merchant 2h systems
+  availability: 0.95            # planned + unplanned outages
+
+battery_unconstrained:
+  power_mw: 10.0
+  energy_mwh: 20.0
+  eta_charge: 0.95
+  eta_discharge: 0.95
+  soc_initial_mwh: 0.0
+  cycle_cost_eur_per_mwh: 2.0
+  max_cycles_per_day: null
+  availability: 1.0
