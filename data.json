@@ -1,9 +1,9 @@
 {
  "zone": "DE-LU",
- "generated": "2026-09-13 16:14 CEST",
+ "generated": "2026-09-14 08:08 CEST",
  "latest": {
   "target_day": "2026-09-15",
-  "issued_at_local": "2026-09-13 16:14 CEST",
+  "issued_at_local": "2026-09-14 08:08 CEST",
   "on_time": true,
   "model": "lgbm[no-fc]",
   "mean": 211.62383144976312,
