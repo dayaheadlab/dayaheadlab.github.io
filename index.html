@@ -59,7 +59,7 @@ footer{color:var(--muted);font-size:12px;padding:30px 20px;text-align:center}
 <text x="72" y="296" fill="#444">预测 forecast</text>
 </svg>
 <dl>
-<dt>发布时间</dt><dd>2026-09-15 08:07 CEST</dd>
+<dt>发布时间</dt><dd>2026-09-15 10:08 CEST</dd>
 <dt>关门前发布</dt><dd>是（关门前发布）</dd>
 <dt>预测均价 / 最低 / 最高</dt><dd>178.6 / 82.0 / 270.3 EUR/MWh</dd>
 <dt>储能计划收益</dt><dd>3,583 EUR（10 MW / 20 MWh，绿色放电、橙色充电）</dd>
@@ -68,10 +68,10 @@ footer{color:var(--muted);font-size:12px;padding:30px 20px;text-align:center}
 
 <h2>实盘记录 · Live track record</h2>
 <p class="muted">只列关门前（柏林 12:00）发布、且交割日已出清并打分的预测。储能收益按下方保守口径计算。</p>
-<p class='muted'>记录从第一个被打分的预测开始累计。</p>
+<div class='kpis'><div><span>已打分天数</span><b>1</b></div><div><span>平均 MAE</span><b>36.3</b></div><div><span>日内排序相关性</span><b>0.941</b></div><div><span>捕获率（收益加权）</span><b>97.6%</b></div><div><span>捕获率（每日平均）</span><b>97.6%</b></div><div><span>累计收益 / 完美预见</span><b>4,718 / 4,833</b></div></div>
 <div class="scroll card"><table>
 <tr><th>交割日</th><th>模型</th><th>MAE</th><th>排序相关性</th><th>预测调度收益</th><th>完美预见收益</th><th>捕获率</th></tr>
-<tr><td colspan=7>首条关门前发布的预测将在次日出清后自动打分并出现在这里。</td></tr>
+<tr><td>2026-09-15</td><td>lgbm[no-fc]</td><td>36.3</td><td>0.941</td><td>4,718</td><td>4,833</td><td>97.6%</td></tr>
 </table>
 <p class='muted'>另有 1 条关门后才发出的预测，已记录但不计入本表和上方统计。</p></div>
 
@@ -106,5 +106,5 @@ footer{color:var(--muted);font-size:12px;padding:30px 20px;text-align:center}
 <p class="muted">仅供研究参考，不构成投资或交易建议。Research only; not trading advice.</p>
 </div>
 </main>
-<footer>日前实验室 · 生成于 2026-09-15 08:08 CEST</footer>
+<footer>日前实验室 · 生成于 2026-09-15 10:08 CEST</footer>
 </body></html>
