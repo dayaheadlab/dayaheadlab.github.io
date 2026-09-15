@@ -31,7 +31,12 @@ class BatteryParams:
 
 
 def optimize_dispatch(prices: np.ndarray, dt_hours: float, params: BatteryParams) -> pd.DataFrame:
-    """Return per-period charge, discharge (MW), soc (MWh) and revenue (EUR) for given prices."""
+    """Return per-period charge, discharge (MW), soc (MWh) and revenue (EUR) for given prices.
+
+    ``prices`` MUST be in chronological order: the state-of-charge recursion walks the array
+    front to back, so an unsorted input silently yields a different, wrong dispatch rather
+    than an error. Callers that build the array from a join or a groupby have to sort first.
+    """
     p = np.asarray(prices, dtype=float)
     T = len(p)
     if T == 0:

@@ -228,6 +228,9 @@ def cloud_daily(
     site_dir: str = typer.Option(".", help="where index.html and data.json are written"),
     backtest_csv: str = typer.Option(None, help="daily backtest results for the benchmark table"),
     model: str = typer.Option("lgbm"),
+    target_day: str = typer.Option(None, help="delivery day to forecast (default: tomorrow). "
+                                              "on_time is always derived from that day's gate "
+                                              "closure, so this cannot be used to backdate."),
 ):
     """Stateless daily run for CI: CSV state in, forecast + site + CSV state out.
 
@@ -251,7 +254,9 @@ def cloud_daily(
             rprint(f"  scored {r['target_day']}: MAE {r['mae']:.1f}, rank {r['rank_corr']:.3f}, "
                    f"capture {(r['capture'] or 0) * 100:.1f}% (on_time={r['on_time']})")
 
-        res = run_daily(store, s, zone, model_name=model, update_series=[PRICE_SERIES])
+        td = pd.Timestamp(target_day, tz=s.timezone) if target_day else None
+        res = run_daily(store, s, zone, model_name=model, update_series=[PRICE_SERIES],
+                        target_day=td)
         # escape: the model label contains [...] which rich would otherwise eat as markup
         rprint(f"[bold]forecast {res['target_day'].date()}[/bold] on_time={res['on_time']} "
                f"model={escape(res['model'])} gate={res['gate']}")

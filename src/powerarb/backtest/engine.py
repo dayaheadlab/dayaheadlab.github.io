@@ -65,7 +65,8 @@ def battery_backtest(
     day = forecasts.index.tz_convert(tz).floor("D")
     p = replace(params, soc_final_min_mwh=params.soc_initial_mwh)  # end each day where it began
     for d, g in forecasts.groupby(day):
-        g = g.dropna(subset=["target"])
+        # sorted because optimize_dispatch walks the array in chronological order
+        g = g.dropna(subset=["target"]).sort_index()
         if len(g) < 20:
             continue
         actual = g["target"].to_numpy()

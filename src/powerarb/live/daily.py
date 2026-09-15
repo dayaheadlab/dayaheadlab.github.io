@@ -137,7 +137,9 @@ def score_pending(store: TimeSeriesStore, settings: Settings, zone: str) -> list
                                  end=local_day + pd.Timedelta(days=1), freq="1h")
         if actual.empty or actual["price.day_ahead"].notna().sum() < 20:
             continue
-        joined = fc.set_index("ts_utc")[["pred"]].join(actual, how="inner").dropna()
+        # sort_index is load-bearing: optimize_dispatch walks the array in order, so an
+        # out-of-order join would silently score a different dispatch
+        joined = fc.set_index("ts_utc")[["pred"]].join(actual, how="inner").dropna().sort_index()
         if len(joined) < 20:
             continue
         m = forecast_metrics(joined["price.day_ahead"], joined["pred"])

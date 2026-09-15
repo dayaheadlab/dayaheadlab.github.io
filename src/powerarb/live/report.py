@@ -219,7 +219,7 @@ footer{{color:var(--muted);font-size:12px;padding:30px 20px;text-align:center}}
 <header><h1>{brand['name_zh']} · {brand['name_en']}</h1>
 <p>{zone} 日前电价预测公开记录 · 每日关门前发布，出清后自动打分 · Public day-ahead forecast track record</p></header>
 <main>
-<h2>次日预测 · {fc_meta.get('target_day', '—')}</h2>
+<h2>下一交割日预测 · {fc_meta.get('target_day', '—')}</h2>
 <div class="card">
 {fc_html}
 <dl>
@@ -251,6 +251,10 @@ footer{{color:var(--muted);font-size:12px;padding:30px 20px;text-align:center}}
 日前关门时刻尚未发布，用它属于泄漏。若使用，回测捕获率会从 91.4% 虚增到 96.2%。
 每日实盘任务会实测各序列可用性，把关门时刻拿不到的从训练和预测两侧同时剔除，
 实际使用的特征集记在上表的模型名里。</p>
+<p><b>同一交割日的多个版本</b>：流水线每天运行两次，同一交割日可能有多条关门前发布的预测。
+打分以<b>关门前最后一条</b>为准，这也是真实交易中会执行的那一条。更早的版本全部保留在
+<code>state/forecast_log.csv</code> 里，每条都带发布时间戳，且每次发布都是一条公开的 Git 提交，
+发布时刻可独立核查。</p>
 <p><b>记录起点</b>：正式发布之前的调试运行（均为关门后发布）未纳入本记录。
 记录从第一条关门前发布的预测开始累计，此后每一天都在，包括错得离谱的日子。</p>
 <p>捕获率 = 按预测调度的收益 ÷ 事后完美预见的收益。</p><p>它衡量预测对储能套利的实际价值，比 MAE 更有意义。
