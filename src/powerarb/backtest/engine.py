@@ -28,27 +28,47 @@ def rolling_forecast(
     retrain_every: int = 7,
     min_train_days: int = 90,
     tz: str = "Europe/Berlin",
+    target_mode: str = "level",
 ) -> pd.DataFrame:
-    """Return frame [target, pred] over [start, end) at the feature index resolution."""
+    """Return frame [target, pred] over [start, end) at the feature index resolution.
+
+    ``target_mode="shape"`` trains on the price minus that delivery day's mean instead of the
+    price itself. Battery dispatch is invariant to adding a constant to all of a day's prices,
+    so the level carries no decision-relevant information; predicting only the shape spends
+    the whole model on the within-day ordering, which is what capture ratio depends on. The
+    prediction is shifted back by a per-day constant (the previous day's mean) purely so that
+    MAE stays comparable; that shift cannot change the dispatch.
+    """
     cols = feature_columns(feats)
+    if target_mode not in ("level", "shape"):
+        raise ValueError(f"unknown target_mode {target_mode}")
     local_day = pd.Series(feats.index.tz_convert(tz).floor("D"), index=feats.index)
     days = pd.DatetimeIndex(sorted(local_day.unique()))
     start_ts = pd.Timestamp(start, tz=tz)
     end_ts = pd.Timestamp(end, tz=tz)
     test_days = days[(days >= start_ts) & (days < end_ts)]
+    y = feats["target"]
+    if target_mode == "shape":
+        day_mean = y.groupby(local_day).transform("mean")
+        y = y - day_mean
+
     preds = []
     fitted = None
     for i, day in enumerate(test_days):
-        train_mask = (local_day < day) & feats["target"].notna()
+        train_mask = (local_day < day) & y.notna()
         if train_mask.sum() < min_train_days * 20:
             continue
         if fitted is None or i % retrain_every == 0:
-            fitted = model.fit(feats.loc[train_mask, cols], feats.loc[train_mask, "target"])
+            fitted = model.fit(feats.loc[train_mask, cols], y[train_mask])
             log.info("retrained %s on %d rows up to %s", model.name, int(train_mask.sum()), day.date())
         test_mask = local_day == day
         X = feats.loc[test_mask, cols]
-        p = fitted.predict(X)
-        preds.append(pd.DataFrame({"target": feats.loc[test_mask, "target"], "pred": p.values}, index=X.index))
+        p = pd.Series(fitted.predict(X).values, index=X.index)
+        if target_mode == "shape":
+            # per-day constant; leaves the dispatch unchanged, makes MAE readable
+            p = p + feats.loc[test_mask, "price_prevday_mean"].fillna(0)
+        preds.append(pd.DataFrame({"target": feats.loc[test_mask, "target"], "pred": p.values},
+                                  index=X.index))
     if not preds:
         return pd.DataFrame(columns=["target", "pred"])
     return pd.concat(preds).sort_index()

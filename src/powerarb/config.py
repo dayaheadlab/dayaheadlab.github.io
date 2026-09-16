@@ -34,6 +34,13 @@ class Settings(BaseModel):
     # and load adds ~0.1pp of capture, so dropping every one of them removes any dependence
     # on publication timing and makes the live job identical to the published backtest.
     forecast_features: str = "none"
+    # Weather forecasts are legal at gate closure (they exist at any hour) and, combined with
+    # the shape target, lift winter capture by ~7pp. Measured 2026-09-16.
+    weather_features: bool = True
+    # "shape": train on price minus that day's mean. Dispatch is invariant to a per-day
+    # constant, so this spends the whole model on the within-day ordering that capture depends
+    # on. Worth ~+1.1pp overall and ~+7pp in winter versus predicting the level.
+    target_mode: str = "shape"
     brand: dict[str, str] = Field(default_factory=lambda: {"name_zh": "powerarb", "name_en": "powerarb"})
     db_path: Path = PROJECT_ROOT / "data" / "powerarb.duckdb"
     entsoe_api_key: str | None = None

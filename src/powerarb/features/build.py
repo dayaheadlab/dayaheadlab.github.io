@@ -19,7 +19,8 @@ ZONE_HOLIDAY_COUNTRY = {"DE-LU": "DE", "AT": "AT", "FR": "FR", "NL": "NL", "BE":
 
 
 def build_features(wide: pd.DataFrame, zone: str, tz: str = "Europe/Berlin",
-                   allowed_forecasts: set[str] | None = None) -> pd.DataFrame:
+                   allowed_forecasts: set[str] | None = None,
+                   weather_raw: bool = False) -> pd.DataFrame:
     """Take an hourly wide frame from the store and return features + ``target``.
 
     Rows where the target is NaN are kept so the same function can produce next-day inputs.
@@ -71,6 +72,30 @@ def build_features(wide: pd.DataFrame, zone: str, tz: str = "Europe/Berlin",
         solar = (sol if sol is not None else zero).fillna(0)
         out["fc_residual_load"] = load - wind - solar
         out["fc_ren_share"] = (wind + solar) / load.replace(0, np.nan)
+
+    # ---- weather forecast (available at any hour, so always legal at gate closure) --------
+    # Measured 2026-09-16: feeding all 12 raw point series plus aggregates helped in winter
+    # (+3.5pp capture) but hurt the rest of the year (-1.2pp), i.e. it overfit. Only the zone
+    # aggregates are kept by default; set weather_raw to put the point series back.
+    wx_cols = [c for c in df.columns if c.startswith("wxfc.")]
+    if weather_raw:
+        for c in wx_cols:
+            out[c] = df[c]
+    # Zone aggregates: the model mostly cares about how much wind and sun the whole zone gets,
+    # and the spread between reference points carries the "is the weather front across the
+    # country or only in the north" information that drives congestion and ramping.
+    for var in ("wind_speed_100m", "shortwave_radiation", "temperature_2m"):
+        cols = [c for c in wx_cols if c.split(".")[1] == var]
+        if len(cols) >= 2:
+            out[f"wx_{var}_mean"] = df[cols].mean(axis=1)
+            out[f"wx_{var}_spread"] = df[cols].max(axis=1) - df[cols].min(axis=1)
+        elif cols:
+            out[f"wx_{var}_mean"] = df[cols[0]]
+    if "wx_wind_speed_100m_mean" in out:
+        # turbine output rises roughly with the cube of wind speed up to rated power
+        out["wx_wind_cubed"] = out["wx_wind_speed_100m_mean"].clip(upper=15) ** 3
+        # rolling means capture whether a windy spell is building or fading
+        out["wx_wind_24h_mean"] = out["wx_wind_speed_100m_mean"].rolling(24, min_periods=6).mean()
 
     # ---- price lags (>= 24h) -------------------------------------------------------------
     if FEATURE_TARGET in df.columns:

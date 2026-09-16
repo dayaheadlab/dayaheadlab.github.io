@@ -19,6 +19,7 @@ import pandas as pd
 from ..backtest.metrics import forecast_metrics
 from ..config import Settings
 from ..data.ingest import update
+from ..data.sources import OpenMeteoForecastSource
 from ..data.store import TimeSeriesStore
 from ..features.build import build_features, feature_columns
 from ..models import LGBMForecaster, SeasonalNaive
@@ -31,6 +32,9 @@ FORECAST_INPUTS = ["forecast.load.day_ahead", "forecast.solar.day_ahead",
                    "forecast.wind_onshore.day_ahead", "forecast.wind_offshore.day_ahead"]
 # A published series counts as usable only if it covers essentially the whole target day.
 MIN_AVAILABILITY = 0.95
+# How much weather-forecast history to pull for training. Two years spans two winters, which
+# is where the weather features earn their keep.
+WEATHER_TRAIN_DAYS = 760
 # settings.forecast_features -> the production types the policy permits (None = all).
 POLICY_SETS: dict[str, set[str] | None] = {"none": set(), "load": {"load"}, "all": None}
 
@@ -61,6 +65,21 @@ def run_daily(
     if do_update:
         counts = update(store, settings, zone, series=update_series)
         log.info("update: %s", counts)
+
+    # Weather forecasts are not carried in the repo state: one request per reference point
+    # covers years, so they are re-fetched each run. A failure here must never break the
+    # record, so it degrades to the weather-free feature set rather than raising.
+    wx_used = False
+    if settings.weather_features and zone in settings.weather_points:
+        try:
+            src = OpenMeteoForecastSource(settings.weather_points)
+            hist_start = (now - pd.Timedelta(days=WEATHER_TRAIN_DAYS)).tz_convert(None)
+            n = store.upsert(src.fetch_history(zone, hist_start, now.tz_convert(None)))
+            n += store.upsert(src.fetch_live(zone))
+            wx_used = n > 0
+            log.info("weather forecast rows: %d", n)
+        except Exception as e:
+            log.error("weather fetch failed, continuing without it: %s", e)
 
     wide = store.read_wide(zone, freq="1h")
     day_start = target_day.tz_convert("UTC")
@@ -95,13 +114,29 @@ def run_daily(
 
     feats = build_features(wide, zone, tz, allowed_forecasts=allowed)
     cols = feature_columns(feats)
-    train = feats[feats["target"].notna()]
+
+    # Train on the within-day shape when configured: battery dispatch is unchanged by adding a
+    # constant to all of a day's prices, so the level is not decision-relevant and modelling it
+    # only spends capacity. See backtest/engine.rolling_forecast for the same transform.
+    local_all = pd.Series(feats.index.tz_convert(tz).floor("D"), index=feats.index)
+    y = feats["target"]
+    if settings.target_mode == "shape":
+        y = y - y.groupby(local_all).transform("mean")
+    train = feats[y.notna()]
     model = LGBMForecaster() if model_name == "lgbm" else SeasonalNaive()
-    model.fit(train[cols], train["target"])
-    model_label = f"{model.name}[{'+'.join(sorted(allowed)) if allowed else 'no-fc'}]"
+    model.fit(train[cols], y[y.notna()])
+    tags = sorted(allowed) if allowed else ["no-fc"]
+    if wx_used:
+        tags.append("wx")
+    if settings.target_mode == "shape":
+        tags.append("shape")
+    model_label = f"{model.name}[{'+'.join(tags)}]"
     X = feats.loc[target_idx, cols]
-    pred = model.predict(X)
-    pred.index = target_idx
+    pred = pd.Series(model.predict(X).values, index=target_idx)
+    if settings.target_mode == "shape":
+        # per-day constant: leaves the dispatch identical, restores a readable price level
+        level = feats.loc[target_idx, "price_prevday_mean"].ffill().fillna(0)
+        pred = pred + level.values
 
     params = replace(BatteryParams(**settings.battery.model_dump()),
                      soc_final_min_mwh=settings.battery.soc_initial_mwh)

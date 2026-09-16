@@ -75,6 +75,9 @@ def backtest(
     forecast_features: str = typer.Option(
         "all", help="which D-1 forecasts to use: all | load | none  (wind/solar are published "
                     "after the 12:00 gate closure, so 'all' leaks)"),
+    weather: bool = typer.Option(False, help="add wxfc.* weather-forecast features"),
+    target_mode: str = typer.Option("level", help="level | shape (shape = price minus that "
+                                                  "day's mean; dispatch only needs the shape)"),
 ):
     """Walk-forward DA price forecast + battery arbitrage settlement."""
     from .backtest import battery_backtest, forecast_metrics, pnl_metrics, rolling_forecast
@@ -89,14 +92,18 @@ def backtest(
         fc = pd.read_csv(forecasts_csv, index_col=0, parse_dates=True)
         fc.index = pd.to_datetime(fc.index, utc=True)
     else:
-        wide = _store().read_wide(zone, freq="1h")
+        st = _store()
+        series = None if weather else [c for c in st.coverage().query("zone == @zone")["series"]
+                                       if not c.startswith("wxfc.")]
+        wide = st.read_wide(zone, series, freq="1h")
         if wide.empty or "price.day_ahead" not in wide:
             rprint("[red]no price data; run `backfill` first[/red]")
             raise typer.Exit(1)
         allowed = {"all": None, "load": {"load"}, "none": set()}[forecast_features]
         feats = build_features(wide, zone, s.timezone, allowed_forecasts=allowed)
         m = LGBMForecaster() if model == "lgbm" else SeasonalNaive()
-        fc = rolling_forecast(feats, m, start, end, retrain_every=retrain_every, tz=s.timezone)
+        fc = rolling_forecast(feats, m, start, end, retrain_every=retrain_every, tz=s.timezone,
+                              target_mode=target_mode)
     if fc.empty:
         rprint("[red]no forecasts produced (not enough training history?)[/red]")
         raise typer.Exit(1)
