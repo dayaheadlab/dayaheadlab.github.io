@@ -138,11 +138,16 @@ def daily(
     s = load_settings()
     zone = zone or s.default_zone
     store = _store()
+    # refresh first: yesterday's run predates that day's auction, so scoring on the stale
+    # store would postpone every delivery day's score by a full day
+    if not no_update:
+        from .data.ingest import update as _refresh
+        rprint("[bold]refresh[/bold]", _refresh(store, s, zone))
     scored = score_pending(store, s, zone)
     for r in scored:
         rprint(f"  scored {r['target_day']}: MAE {r['mae']:.1f}, rank {r['rank_corr']:.3f}, "
                f"capture {(r['capture'] or 0) * 100:.1f}% (on_time={r['on_time']})")
-    res = run_daily(store, s, zone, model_name=model, do_update=not no_update)
+    res = run_daily(store, s, zone, model_name=model, do_update=False)
     rprint(f"[bold]forecast {res['target_day'].date()}[/bold] issued {res['issued_at']} "
            f"on_time={res['on_time']} model={escape(res['model'])} (gate {res['gate']})")
     rprint(f"  inputs available for target day: {res['availability']}")
@@ -249,14 +254,19 @@ def cloud_daily(
         store = TimeSeriesStore(Path(tmp) / "run.duckdb")
         rprint("[bold]import[/bold]", import_state(store, state_dir))
 
+        # Refresh prices BEFORE scoring. The previous run happened before that day's auction
+        # cleared, so the imported state cannot contain the prices needed to score it; scoring
+        # first would leave every delivery day unscored until the following day.
+        from .data.ingest import update as _refresh
+        rprint("[bold]refresh[/bold]", _refresh(store, s, zone, series=[PRICE_SERIES]))
+
         scored = score_pending(store, s, zone)
         for r in scored:
             rprint(f"  scored {r['target_day']}: MAE {r['mae']:.1f}, rank {r['rank_corr']:.3f}, "
                    f"capture {(r['capture'] or 0) * 100:.1f}% (on_time={r['on_time']})")
 
         td = pd.Timestamp(target_day, tz=s.timezone) if target_day else None
-        res = run_daily(store, s, zone, model_name=model, update_series=[PRICE_SERIES],
-                        target_day=td)
+        res = run_daily(store, s, zone, model_name=model, do_update=False, target_day=td)
         # escape: the model label contains [...] which rich would otherwise eat as markup
         rprint(f"[bold]forecast {res['target_day'].date()}[/bold] on_time={res['on_time']} "
                f"model={escape(res['model'])} gate={res['gate']}")
