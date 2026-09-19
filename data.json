@@ -1,26 +1,41 @@
 {
  "zone": "DE-LU",
- "generated": "2026-09-18 10:09 CEST",
+ "generated": "2026-09-19 08:09 CEST",
  "latest": {
-  "target_day": "2026-09-19",
-  "issued_at_local": "2026-09-18 10:07 CEST",
+  "target_day": "2026-09-20",
+  "issued_at_local": "2026-09-19 08:07 CEST",
   "on_time": true,
   "model": "lgbm[no-fc+shape]",
-  "mean": 117.01875502397083,
-  "min": 23.696623556460565,
-  "max": 181.17319644876335,
-  "planned_revenue": 2820.622372591883
+  "mean": 52.8773874111022,
+  "min": -20.442434810771125,
+  "max": 127.08310077932671,
+  "planned_revenue": 2638.263272611087
  },
  "summary": {
-  "days": 4,
-  "mae": 27.52525,
-  "rank_corr": 0.95025,
-  "capture": 0.9700743211077828,
-  "capture_daily_mean": 0.9693243703847012,
-  "rev_forecast": 15525.317486842107,
-  "rev_perfect": 16004.25570394737
+  "days": 5,
+  "mae": 36.8908,
+  "rank_corr": 0.9488,
+  "capture": 0.9709759620515742,
+  "capture_daily_mean": 0.9709845078716681,
+  "rev_forecast": 17646.992407894737,
+  "rev_perfect": 18174.48948026316
  },
  "scores": [
+  {
+   "zone": "DE-LU",
+   "target_day": "2026-09-19",
+   "issued_at": "2026-09-18 08:07:19.783309",
+   "on_time": true,
+   "n": 24,
+   "mae": 74.353,
+   "rmse": 79.77,
+   "rank_corr": 0.943,
+   "rev_forecast": 2121.674921052632,
+   "rev_perfect": 2170.2337763157893,
+   "capture": 0.9776250578195352,
+   "scored_at": "2026-09-19 06:07:33.409703",
+   "model": "lgbm[no-fc+shape]"
+  },
   {
    "zone": "DE-LU",
    "target_day": "2026-09-18",
