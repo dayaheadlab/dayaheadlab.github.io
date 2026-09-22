@@ -74,9 +74,31 @@ class OpenMeteoForecastSource(DataSource):
 
     name = "open_meteo_forecast"
 
-    def __init__(self, points: dict[str, dict[str, list[float]]], timeout: int = 120):
+    def __init__(self, points: dict[str, dict[str, list[float]]], timeout: int = 180,
+                 retries: int = 4):
         self.points = points
         self.timeout = timeout
+        self.retries = retries
+
+    def _get(self, url: str, params: dict) -> dict:
+        """GET with exponential backoff. The archived-forecast endpoint drops connections now
+        and then (2 of the first 8 live days, 2026-09-18/19); without retries each drop cost
+        the day its weather features."""
+        import time as _time
+
+        last: Exception | None = None
+        for attempt in range(self.retries + 1):
+            try:
+                r = requests.get(url, params=params, timeout=self.timeout)
+                if r.status_code == 429 or r.status_code >= 500:
+                    raise requests.HTTPError(f"{r.status_code} from {url}")
+                r.raise_for_status()
+                return r.json()
+            except (requests.RequestException, ValueError) as e:
+                last = e
+                if attempt < self.retries:
+                    _time.sleep(min(60, 5 * 2 ** attempt))
+        raise RuntimeError(f"open-meteo failed after {self.retries + 1} attempts: {last}")
 
     def available_series(self, zone: str) -> list[str]:
         return [f"wxfc.{v}.{p}" for p in self.points.get(zone, {}) for v in FORECAST_VARS]
@@ -109,9 +131,8 @@ class OpenMeteoForecastSource(DataSource):
                 "end_date": pd.Timestamp(end).strftime("%Y-%m-%d"),
                 "hourly": ",".join(v + "_previous_day1" for v in FORECAST_VARS),
             }
-            r = requests.get(ARCHIVED_FORECAST_URL, params=params, timeout=self.timeout)
-            r.raise_for_status()
-            frames.append(self._parse(r.json(), zone, point, "_previous_day1"))
+            frames.append(self._parse(self._get(ARCHIVED_FORECAST_URL, params), zone, point,
+                                      "_previous_day1"))
         return pd.concat(frames, ignore_index=True) if frames else empty_long()
 
     def fetch_live(self, zone: str, forecast_days: int = 3) -> pd.DataFrame:
@@ -121,7 +142,5 @@ class OpenMeteoForecastSource(DataSource):
             params = {"latitude": lat, "longitude": lon, "timezone": "UTC",
                       "forecast_days": forecast_days, "past_days": 2,
                       "hourly": ",".join(FORECAST_VARS)}
-            r = requests.get(LIVE_FORECAST_URL, params=params, timeout=self.timeout)
-            r.raise_for_status()
-            frames.append(self._parse(r.json(), zone, point, ""))
+            frames.append(self._parse(self._get(LIVE_FORECAST_URL, params), zone, point, ""))
         return pd.concat(frames, ignore_index=True) if frames else empty_long()

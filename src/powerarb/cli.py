@@ -252,7 +252,8 @@ def cloud_daily(
     """
     import tempfile
 
-    from .live import build_site, export_state, import_state, run_daily, score_pending
+    from .live import (backfill_shape_mae, build_site, export_state, import_state, run_daily,
+                       score_pending)
     from .live.portable import PRICE_SERIES
 
     s = load_settings()
@@ -269,8 +270,10 @@ def cloud_daily(
 
         scored = score_pending(store, s, zone)
         for r in scored:
-            rprint(f"  scored {r['target_day']}: MAE {r['mae']:.1f}, rank {r['rank_corr']:.3f}, "
-                   f"capture {(r['capture'] or 0) * 100:.1f}% (on_time={r['on_time']})")
+            rprint(f"  scored {r['target_day']}: shape err {r['shape_mae']:.1f}, "
+                   f"rank {r['rank_corr']:.3f}, capture {(r['capture'] or 0) * 100:.1f}% "
+                   f"(on_time={r['on_time']})")
+        rprint(f"  shape_mae backfilled: {backfill_shape_mae(store, s, zone)}")
 
         td = pd.Timestamp(target_day, tz=s.timezone) if target_day else None
         res = run_daily(store, s, zone, model_name=model, do_update=False, target_day=td)

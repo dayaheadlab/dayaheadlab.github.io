@@ -124,6 +124,7 @@ def build_site(store: TimeSeriesStore, settings: Settings, zone: str,
         rev_fc, rev_pf = float(on_time["rev_forecast"].sum()), float(on_time["rev_perfect"].sum())
         summary = {
             "days": int(len(on_time)), "mae": float(on_time["mae"].mean()),
+            "shape_mae": float(on_time["shape_mae"].mean()) if "shape_mae" in on_time and on_time["shape_mae"].notna().any() else float("nan"),
             "rank_corr": float(on_time["rank_corr"].mean()),
             "capture": rev_fc / rev_pf if rev_pf > 0 else float("nan"),  # revenue-weighted
             "capture_daily_mean": float(on_time["capture"].mean()),
@@ -134,7 +135,7 @@ def build_site(store: TimeSeriesStore, settings: Settings, zone: str,
     n_late = int(len(scores) - len(on_time)) if not scores.empty else 0
     rows_html = "".join(
         f"<tr><td>{r.target_day}</td><td>{r.model if hasattr(r, 'model') else ''}</td>"
-        f"<td>{_fmt(r.mae)}</td>"
+        f"<td>{_fmt(getattr(r, 'shape_mae', None))}</td>"
         f"<td>{_fmt(r.rank_corr, 3)}</td><td>{_fmt(r.rev_forecast, 0)}</td><td>{_fmt(r.rev_perfect, 0)}</td>"
         f"<td>{_fmt(r.capture * 100 if r.capture is not None else None, 1, '%')}</td></tr>"
         for r in on_time.head(60).itertuples()) if not on_time.empty else \
@@ -191,7 +192,7 @@ def build_site(store: TimeSeriesStore, settings: Settings, zone: str,
     summary_html = (
         f"<div class='kpis'>"
         f"<div><span>已打分天数</span><b>{summary['days']}</b></div>"
-        f"<div><span>平均 MAE</span><b>{_fmt(summary['mae'])}</b></div>"
+        f"<div><span>平均形状误差</span><b>{_fmt(summary['shape_mae'])}</b></div>"
         f"<div><span>日内排序相关性</span><b>{_fmt(summary['rank_corr'], 3)}</b></div>"
         f"<div><span>捕获率（收益加权）</span><b>{_fmt(summary['capture'] * 100, 1, '%')}</b></div>"
         f"<div><span>捕获率（每日平均）</span><b>{_fmt(summary['capture_daily_mean'] * 100, 1, '%')}</b></div>"
@@ -234,7 +235,7 @@ footer{{color:var(--muted);font-size:12px;padding:30px 20px;text-align:center}}
 <p class="muted">只列关门前（柏林 12:00）发布、且交割日已出清并打分的预测。储能收益按下方保守口径计算。</p>
 {summary_html}
 <div class="scroll card"><table>
-<tr><th>交割日</th><th>模型</th><th>MAE</th><th>排序相关性</th><th>预测调度收益</th><th>完美预见收益</th><th>捕获率</th></tr>
+<tr><th>交割日</th><th>模型</th><th>形状误差</th><th>排序相关性</th><th>预测调度收益</th><th>完美预见收益</th><th>捕获率</th></tr>
 {rows_html}
 </table>
 {late_note}</div>
@@ -257,6 +258,11 @@ footer{{color:var(--muted);font-size:12px;padding:30px 20px;text-align:center}}
 发布时刻可独立核查。</p>
 <p><b>记录起点</b>：正式发布之前的调试运行（均为关门后发布）未纳入本记录。
 记录从第一条关门前发布的预测开始累计，此后每一天都在，包括错得离谱的日子。</p>
+<p><b>为什么报形状误差而不是 MAE</b>：模型预测的是日内形状（每个时段相对当日均值的高低），
+价格水平用前一天均价补上。储能调度只取决于形状，对"当天所有时段同时加减一个数"完全不敏感。
+所以当天整体价格大涨大跌时，按价格水平算的 MAE 会随之暴涨，却不影响调度收益，
+它衡量的其实是价格水平比昨天变了多少，而不是模型好坏。形状误差先去掉各自的当日均值再比较，
+衡量的才是模型真正在做的事。</p>
 <p>捕获率 = 按预测调度的收益 ÷ 事后完美预见的收益。</p><p>它衡量预测对储能套利的实际价值，比 MAE 更有意义。
 两种算法都列出：<b>收益加权</b>是区间内总收益之比，回答"可赚的钱captured了多少"；<b>每日平均</b>是逐日比值的算术平均，
 把低收益日与高收益日等权重看待，数值更低也更保守。引用时请注明用的是哪一种。</p>

@@ -153,6 +153,40 @@ def run_daily(
     }
 
 
+def _shape_mae(pred: np.ndarray, actual: np.ndarray) -> float:
+    """MAE after removing each series' own daily mean: how well the within-day shape was
+    predicted, independent of the level. This is the error that matters for dispatch."""
+    return float(np.abs((pred - pred.mean()) - (actual - actual.mean())).mean())
+
+
+def backfill_shape_mae(store: TimeSeriesStore, settings: Settings, zone: str) -> int:
+    """Fill shape_mae for rows scored before the column existed. Idempotent."""
+    tz = settings.timezone
+    scores = store.read_scores(zone)
+    if scores.empty or "shape_mae" not in scores:
+        return 0
+    todo = scores[scores["shape_mae"].isna()]
+    n = 0
+    for r in todo.itertuples():
+        fc = store.read_forecast(zone, r.target_day, issued_at=r.issued_at)
+        if fc.empty:
+            continue
+        local_day = pd.Timestamp(r.target_day, tz=tz)
+        actual = store.read_wide(zone, ["price.day_ahead"], start=local_day,
+                                 end=local_day + pd.Timedelta(days=1), freq="1h")
+        joined = fc.set_index("ts_utc")[["pred"]].join(actual, how="inner").dropna().sort_index()
+        if len(joined) < 20:
+            continue
+        sm = _shape_mae(joined["pred"].to_numpy(), joined["price.day_ahead"].to_numpy())
+        store.conn.execute(
+            "UPDATE score_log SET shape_mae = ? WHERE zone = ? AND target_day = ? AND issued_at = ?",
+            [sm, zone, pd.Timestamp(r.target_day).date(),
+             pd.Timestamp(r.issued_at).tz_localize(None) if pd.Timestamp(r.issued_at).tzinfo is None
+             else pd.Timestamp(r.issued_at).tz_convert("UTC").tz_localize(None)])
+        n += 1
+    return n
+
+
 def score_pending(store: TimeSeriesStore, settings: Settings, zone: str) -> list[dict]:
     """Score every logged target day whose realised hourly prices are now complete."""
     tz = settings.timezone
@@ -180,6 +214,7 @@ def score_pending(store: TimeSeriesStore, settings: Settings, zone: str) -> list
         m = forecast_metrics(joined["price.day_ahead"], joined["pred"])
         a = joined["price.day_ahead"].to_numpy()
         p = joined["pred"].to_numpy()
+        shape_mae = _shape_mae(p, a)
         rev_fc = float(settle_dispatch(optimize_dispatch(p, 1.0, params), a, 1.0, params).sum())
         rev_pf = float(settle_dispatch(optimize_dispatch(a, 1.0, params), a, 1.0, params).sum())
         row = {
@@ -189,6 +224,7 @@ def score_pending(store: TimeSeriesStore, settings: Settings, zone: str) -> list
             "capture": rev_fc / rev_pf if rev_pf > 0 else None,
             "scored_at": pd.Timestamp.now(tz="UTC"),
             "model": str(fc["model"].iloc[0]) if "model" in fc else None,
+            "shape_mae": shape_mae,
         }
         store.log_score(row)
         results.append(row)

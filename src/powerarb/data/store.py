@@ -56,7 +56,13 @@ CREATE TABLE IF NOT EXISTS score_log (
 """
 
 # Columns added after the first release; applied to stores created by an older version.
-_MIGRATIONS = ["ALTER TABLE score_log ADD COLUMN IF NOT EXISTS model VARCHAR"]
+_MIGRATIONS = [
+    "ALTER TABLE score_log ADD COLUMN IF NOT EXISTS model VARCHAR",
+    # Error on the within-day shape. Under the shape target the level is reconstructed from the
+    # previous day's mean, so level MAE mostly measures how far the day's price level moved
+    # (MAE tracked the day-over-day mean jump almost exactly), not model skill.
+    "ALTER TABLE score_log ADD COLUMN IF NOT EXISTS shape_mae DOUBLE",
+]
 
 
 def _to_naive_utc(ts: pd.Series) -> pd.Series:
@@ -209,7 +215,7 @@ class TimeSeriesStore:
 
     def log_score(self, row: dict) -> None:
         cols = ["zone", "target_day", "issued_at", "on_time", "n", "mae", "rmse", "rank_corr",
-                "rev_forecast", "rev_perfect", "capture", "scored_at", "model"]
+                "rev_forecast", "rev_perfect", "capture", "scored_at", "model", "shape_mae"]
         vals = [row.get(c) for c in cols]
         vals[cols.index("target_day")] = pd.Timestamp(vals[cols.index("target_day")]).date()
         vals[cols.index("issued_at")] = _naive(vals[cols.index("issued_at")])
