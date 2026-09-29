@@ -1,15 +1,15 @@
 {
  "zone": "DE-LU",
- "generated": "2026-09-29 08:08 CEST",
+ "generated": "2026-09-29 10:10 CEST",
  "latest": {
   "target_day": "2026-09-30",
-  "issued_at_local": "2026-09-29 08:08 CEST",
+  "issued_at_local": "2026-09-29 10:09 CEST",
   "on_time": true,
   "model": "lgbm[no-fc+wx+shape]",
-  "mean": 166.1051771851069,
-  "min": 68.90496648237202,
-  "max": 252.25799583431814,
-  "planned_revenue": 3637.7180568933823
+  "mean": 162.7373921109809,
+  "min": 68.5353195061796,
+  "max": 248.40208239826043,
+  "planned_revenue": 3482.5780376196653
  },
  "summary": {
   "days": 15,
